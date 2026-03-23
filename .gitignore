@@ -1,3 +1,6 @@
+# GoReleaser output
+dist/
+
 # Binaries
 goforge
 *.exe
