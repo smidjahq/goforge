@@ -1,0 +1,14 @@
+// Package entity contains domain types for {{.Name}}.
+package entity
+
+import "time"
+
+// Person is the Person domain entity.
+// This struct mirrors what sqlc would generate from the SQL schema.
+// Run `sqlc generate` after applying migrations to regenerate if needed.
+type Person struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

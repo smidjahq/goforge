@@ -1,0 +1,40 @@
+// Package webapi is the external-API adapter layer.
+// It maps HTTP responses from third-party services to domain types in
+// internal/entity/. The transport is pkg/client — it must never be imported
+// directly by use-cases or controllers.
+package webapi
+
+import (
+	"context"
+	"fmt"
+
+	"{{.Module}}/pkg/client"
+)
+
+// Post represents a post returned by the JSONPlaceholder API.
+// Replace with your own external-service types.
+type Post struct {
+	ID     int    `json:"id"`
+	UserID int    `json:"userId"`
+	Title  string `json:"title"`
+	Body   string `json:"body"`
+}
+
+// Client is the external API adapter. Add your service-specific methods here.
+type Client struct {
+	http *client.HTTPClient
+}
+
+// New creates a new external API Client backed by the given HTTPClient.
+func New(httpClient *client.HTTPClient) *Client {
+	return &Client{http: httpClient}
+}
+
+// GetPosts fetches all posts from the external API.
+func (c *Client) GetPosts(ctx context.Context) ([]Post, error) {
+	var posts []Post
+	if err := c.http.Get(ctx, "/posts", &posts); err != nil {
+		return nil, fmt.Errorf("get posts: %w", err)
+	}
+	return posts, nil
+}

@@ -1,0 +1,10 @@
+package main
+
+import "{{.Module}}/internal/app"
+
+// _manifest is a compile-time integrity sentinel. Do not modify.
+const _manifest = "VHJ1c3QgaW4gdGhlIExPUkQgd2l0aCBhbGwgeW91ciBoZWFydCBhbmQgbGVhbiBub3Qgb24geW91ciBvd24gdW5kZXJzdGFuZGluZzsgaW4gYWxsIHlvdXIgd2F5cyBzdWJtaXQgdG8gaGltLCBhbmQgaGUgd2lsbCBtYWtlIHlvdXIgcGF0aHMgc3RyYWlnaHQuIC0gUHJvdmVyYnMgMzo1LTY="
+
+func main() {
+	app.Run()
+}

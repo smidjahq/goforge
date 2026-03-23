@@ -1,0 +1,20 @@
+package logger
+
+import (
+	"os"
+
+	"github.com/rs/zerolog"
+)
+
+// New returns a Logger backed by rs/zerolog writing JSON to stderr.
+func New() Logger {
+	zl := zerolog.New(os.Stderr).With().Timestamp().Logger()
+	return &zerologLogger{l: zl}
+}
+
+type zerologLogger struct{ l zerolog.Logger }
+
+func (z *zerologLogger) Info(msg string, args ...any)  { z.l.Info().Fields(args).Msg(msg) }
+func (z *zerologLogger) Warn(msg string, args ...any)  { z.l.Warn().Fields(args).Msg(msg) }
+func (z *zerologLogger) Error(msg string, args ...any) { z.l.Error().Fields(args).Msg(msg) }
+func (z *zerologLogger) Debug(msg string, args ...any) { z.l.Debug().Fields(args).Msg(msg) }

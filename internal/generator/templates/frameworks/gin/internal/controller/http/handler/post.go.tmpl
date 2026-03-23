@@ -1,0 +1,31 @@
+package handler
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	"{{.Module}}/internal/usecase"
+)
+
+// PostHandler handles HTTP requests that delegate to an external API.
+type PostHandler struct {
+	svc *usecase.PostService
+}
+
+// NewPostHandler creates a PostHandler backed by the given service.
+func NewPostHandler(svc *usecase.PostService) *PostHandler {
+	return &PostHandler{svc: svc}
+}
+
+// List handles GET /api/v1/posts.
+// It fetches posts from the external API via the service layer.
+func (h *PostHandler) List(c *gin.Context) {
+	posts, err := h.svc.ListPosts(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, posts)
+}

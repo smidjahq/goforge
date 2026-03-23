@@ -1,0 +1,46 @@
+package persistent
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"os"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+)
+
+// DB wraps database/sql for PostgreSQL via the pgx stdlib driver.
+type DB struct {
+	Conn *sql.DB
+}
+
+// Connect opens a database/sql connection to PostgreSQL.
+// Set DATABASE_URL or the individual DB_* environment variables.
+func Connect(ctx context.Context) (*DB, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = fmt.Sprintf(
+			"postgres://%s:%s@%s:%s/%s",
+			getEnv("DB_USER", "postgres"),
+			getEnv("DB_PASSWORD", "postgres"),
+			getEnv("DB_HOST", "localhost"),
+			getEnv("DB_PORT", "5432"),
+			getEnv("DB_NAME", "{{.Name}}"),
+		)
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open postgres: %w", err)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("ping postgres: %w", err)
+	}
+	return &DB{Conn: db}, nil
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

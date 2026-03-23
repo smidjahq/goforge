@@ -1,0 +1,16 @@
+package logger
+
+import "go.uber.org/zap"
+
+// New returns a Logger backed by uber-go/zap (production config).
+func New() Logger {
+	l, _ := zap.NewProduction()
+	return &zapLogger{l: l.Sugar()}
+}
+
+type zapLogger struct{ l *zap.SugaredLogger }
+
+func (z *zapLogger) Info(msg string, args ...any)  { z.l.Infow(msg, args...) }
+func (z *zapLogger) Warn(msg string, args ...any)  { z.l.Warnw(msg, args...) }
+func (z *zapLogger) Error(msg string, args ...any) { z.l.Errorw(msg, args...) }
+func (z *zapLogger) Debug(msg string, args ...any) { z.l.Debugw(msg, args...) }

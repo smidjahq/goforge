@@ -1,0 +1,22 @@
+.PHONY: run test lint compose-up compose-down migrate-up migrate-down
+
+run:
+	go run ./cmd/app
+
+test:
+	go test ./... -race -count=1
+
+lint:
+	golangci-lint run ./...
+
+compose-up:
+	docker compose up -d
+
+compose-down:
+	docker compose down
+
+migrate-up:
+	migrate -path migrations/ -database "$$DATABASE_URL" up
+
+migrate-down:
+	migrate -path migrations/ -database "$$DATABASE_URL" down 1

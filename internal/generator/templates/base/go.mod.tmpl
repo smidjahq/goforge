@@ -1,0 +1,42 @@
+module {{.Module}}
+
+go 1.26
+{{- $pgGorm := eq .DB "postgres-gorm"}}
+{{- $pgSqlc := eq .DB "postgres-sqlc"}}
+{{- $pgRaw  := eq .DB "postgres-raw"}}
+{{- $sqGorm := eq .DB "sqlite-gorm"}}
+{{- $sqRaw  := eq .DB "sqlite-raw"}}
+{{- $hasGorm := or $pgGorm $sqGorm}}
+{{- $hasPgx  := or $pgSqlc $pgRaw}}
+
+require (
+	github.com/joho/godotenv v1.5.1
+	github.com/spf13/viper v1.19.0
+{{- if eq .Framework "gin"}}
+	github.com/gin-gonic/gin v1.10.0
+{{- end}}
+{{- if eq .Framework "chi"}}
+	github.com/go-chi/chi/v5 v5.2.1
+{{- end}}
+{{- if $hasGorm}}
+	gorm.io/gorm v1.25.12
+{{- end}}
+{{- if $pgGorm}}
+	gorm.io/driver/postgres v1.5.9
+{{- end}}
+{{- if $sqGorm}}
+	gorm.io/driver/sqlite v1.5.7
+{{- end}}
+{{- if $hasPgx}}
+	github.com/jackc/pgx/v5 v5.7.2
+{{- end}}
+{{- if $sqRaw}}
+	github.com/mattn/go-sqlite3 v1.14.24
+{{- end}}
+{{- if eq .Logger "zap"}}
+	go.uber.org/zap v1.27.0
+{{- end}}
+{{- if eq .Logger "zerolog"}}
+	github.com/rs/zerolog v1.33.0
+{{- end}}
+)

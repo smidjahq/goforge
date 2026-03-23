@@ -1,0 +1,64 @@
+package handler
+{{- if ne .DB "none"}}
+
+import (
+	"encoding/json"
+	"net/http"
+	"strings"
+
+	"{{.Module}}/internal/usecase"
+)
+
+// PersonHandler handles HTTP requests for the Person resource.
+type PersonHandler struct {
+	svc *usecase.PersonService
+}
+
+// NewPersonHandler creates a PersonHandler backed by the given service.
+func NewPersonHandler(svc *usecase.PersonService) *PersonHandler {
+	return &PersonHandler{svc: svc}
+}
+
+type createPersonRequest struct {
+	Name string `json:"name"`
+}
+
+// Create handles POST /api/v1/persons.
+// It validates the request body and delegates creation to the service layer.
+func (h *PersonHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var req createPersonRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+	if strings.TrimSpace(req.Name) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name is required"})
+		return
+	}
+
+	person, err := h.svc.Create(r.Context(), req.Name)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, person)
+}
+
+// List handles GET /api/v1/persons.
+func (h *PersonHandler) List(w http.ResponseWriter, r *http.Request) {
+	persons, err := h.svc.List(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, persons)
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+{{- end}}

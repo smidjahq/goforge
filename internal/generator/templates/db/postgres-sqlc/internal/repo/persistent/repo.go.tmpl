@@ -1,0 +1,42 @@
+package persistent
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Pool wraps a pgx connection pool used by sqlc-generated queriers.
+type Pool struct {
+	Conn *pgxpool.Pool
+}
+
+// Connect opens a pgx connection pool to PostgreSQL.
+// Set DATABASE_URL or the individual DB_* environment variables.
+func Connect(ctx context.Context) (*Pool, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = fmt.Sprintf(
+			"postgres://%s:%s@%s:%s/%s",
+			getEnv("DB_USER", "postgres"),
+			getEnv("DB_PASSWORD", "postgres"),
+			getEnv("DB_HOST", "localhost"),
+			getEnv("DB_PORT", "5432"),
+			getEnv("DB_NAME", "{{.Name}}"),
+		)
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("connect to postgres: %w", err)
+	}
+	return &Pool{Conn: pool}, nil
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

@@ -1,0 +1,32 @@
+package persistent
+
+import (
+	"fmt"
+	"os"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+)
+
+// DB wraps the GORM database connection for SQLite.
+type DB struct {
+	Conn *gorm.DB
+}
+
+// Connect opens a GORM connection to SQLite.
+// Set DB_PATH to override the default database file path.
+func Connect() (*DB, error) {
+	path := getEnv("DB_PATH", "{{.Name}}.db")
+	conn, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("connect to sqlite: %w", err)
+	}
+	return &DB{Conn: conn}, nil
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

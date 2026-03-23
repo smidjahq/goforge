@@ -1,0 +1,18 @@
+// Package entity contains domain types for {{.Name}}.
+package entity
+
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
+
+// Person is the Person domain entity. GORM uses struct tags for column mapping
+// and manages CreatedAt / UpdatedAt automatically.
+type Person struct {
+	ID        uint           `gorm:"primarykey"  json:"id"`
+	Name      string         `gorm:"not null"    json:"name"`
+	CreatedAt time.Time      `                   json:"created_at"`
+	UpdatedAt time.Time      `                   json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index"       json:"-"`
+}

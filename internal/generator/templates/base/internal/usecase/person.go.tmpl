@@ -1,0 +1,38 @@
+// Package usecase contains business-logic services for {{.Name}}.
+package usecase
+{{- if ne .DB "none"}}
+
+import (
+	"context"
+
+	"{{.Module}}/internal/entity"
+)
+
+// PersonRepo is the storage interface for the Person entity.
+// It is satisfied by all persistent repository implementations in
+// internal/repo/persistent/.
+type PersonRepo interface {
+	Create(ctx context.Context, name string) (*entity.Person, error)
+	FindAll(ctx context.Context) ([]*entity.Person, error)
+}
+
+// PersonService implements business logic for Person management.
+type PersonService struct {
+	repo PersonRepo
+}
+
+// NewPersonService creates a new PersonService backed by the given repo.
+func NewPersonService(repo PersonRepo) *PersonService {
+	return &PersonService{repo: repo}
+}
+
+// Create validates and persists a new Person.
+func (s *PersonService) Create(ctx context.Context, name string) (*entity.Person, error) {
+	return s.repo.Create(ctx, name)
+}
+
+// List returns all persisted Persons.
+func (s *PersonService) List(ctx context.Context) ([]*entity.Person, error) {
+	return s.repo.FindAll(ctx)
+}
+{{- end}}

@@ -1,0 +1,42 @@
+package persistent
+
+import (
+	"fmt"
+	"os"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+// DB wraps the GORM database connection.
+type DB struct {
+	Conn *gorm.DB
+}
+
+// Connect opens a GORM connection to PostgreSQL.
+// Set DATABASE_URL or the individual DB_* environment variables.
+func Connect() (*DB, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = fmt.Sprintf(
+			"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
+			getEnv("DB_HOST", "localhost"),
+			getEnv("DB_USER", "postgres"),
+			getEnv("DB_PASSWORD", "postgres"),
+			getEnv("DB_NAME", "{{.Name}}"),
+			getEnv("DB_PORT", "5432"),
+		)
+	}
+	conn, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("connect to postgres: %w", err)
+	}
+	return &DB{Conn: conn}, nil
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

@@ -1,0 +1,15 @@
+package logger
+
+import "log/slog"
+
+// New returns a Logger backed by stdlib slog using the default handler.
+func New() Logger {
+	return &slogLogger{l: slog.Default()}
+}
+
+type slogLogger struct{ l *slog.Logger }
+
+func (s *slogLogger) Info(msg string, args ...any)  { s.l.Info(msg, args...) }
+func (s *slogLogger) Warn(msg string, args ...any)  { s.l.Warn(msg, args...) }
+func (s *slogLogger) Error(msg string, args ...any) { s.l.Error(msg, args...) }
+func (s *slogLogger) Debug(msg string, args ...any) { s.l.Debug(msg, args...) }

@@ -1,0 +1,130 @@
+package config
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
+)
+
+// Config holds all runtime configuration for {{.Name}}.
+type Config struct {
+	Server   ServerConfig   `mapstructure:"server"`
+	Log      LogConfig      `mapstructure:"log"`
+{{- if ne .DB "none"}}
+	Database DatabaseConfig `mapstructure:"database"`
+{{- end}}
+}
+
+// ServerConfig holds HTTP server settings.
+type ServerConfig struct {
+	Port    int    `mapstructure:"port"`
+	Version string `mapstructure:"version"`
+}
+
+// LogConfig holds logging settings.
+type LogConfig struct {
+	Level string `mapstructure:"level"`
+}
+{{if ne .DB "none"}}
+// DatabaseConfig holds database connection settings.
+type DatabaseConfig struct {
+{{- if or (eq .DB "postgres-gorm") (eq .DB "postgres-sqlc") (eq .DB "postgres-raw")}}
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	User     string `mapstructure:"user"`
+	Password string `mapstructure:"password"`
+	Database string `mapstructure:"database"`
+	SSLMode  string `mapstructure:"ssl_mode"`
+{{- end}}
+{{- if or (eq .DB "sqlite-gorm") (eq .DB "sqlite-raw")}}
+	Path string `mapstructure:"path"`
+{{- end}}
+}
+{{end}}
+var (
+	config *Config
+	once   sync.Once
+)
+
+// Load returns the singleton Config, loading it on the first call.
+// It reads application.yml first, then overrides with values from .env.
+// Panics if required configuration is missing or the config file cannot be read.
+func Load() *Config {
+	once.Do(func() {
+		_ = godotenv.Load()
+
+		viper.SetConfigName("application")
+		viper.SetConfigType("yml")
+		viper.AddConfigPath(".")
+
+		viper.SetDefault("server.port", 8080)
+		viper.SetDefault("log.level", "info")
+{{- if or (eq .DB "postgres-gorm") (eq .DB "postgres-sqlc") (eq .DB "postgres-raw")}}
+		viper.SetDefault("database.port", 5432)
+		viper.SetDefault("database.ssl_mode", "disable")
+{{- end}}
+{{- if or (eq .DB "sqlite-gorm") (eq .DB "sqlite-raw")}}
+		viper.SetDefault("database.path", "./data.db")
+{{- end}}
+
+		viper.AutomaticEnv()
+		viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+		_ = viper.BindEnv("server.port", "SERVER_PORT")
+		_ = viper.BindEnv("server.version", "VERSION")
+{{- if or (eq .DB "postgres-gorm") (eq .DB "postgres-sqlc") (eq .DB "postgres-raw")}}
+		_ = viper.BindEnv("database.host", "DB_HOST")
+		_ = viper.BindEnv("database.port", "DB_PORT")
+		_ = viper.BindEnv("database.user", "DB_USER")
+		_ = viper.BindEnv("database.password", "DB_PASSWORD")
+		_ = viper.BindEnv("database.database", "DB_NAME")
+		_ = viper.BindEnv("database.ssl_mode", "DB_SSL_MODE")
+{{- end}}
+{{- if or (eq .DB "sqlite-gorm") (eq .DB "sqlite-raw")}}
+		_ = viper.BindEnv("database.path", "DB_PATH")
+{{- end}}
+
+		if err := viper.ReadInConfig(); err != nil {
+			panic(fmt.Sprintf("failed to read application.yml: %v", err))
+		}
+
+		var cfg Config
+		if err := viper.Unmarshal(&cfg); err != nil {
+			panic(fmt.Sprintf("failed to unmarshal config: %v", err))
+		}
+
+		if err := cfg.validate(); err != nil {
+			panic(fmt.Sprintf("missing required configuration — %v", err))
+		}
+
+		config = &cfg
+	})
+
+	return config
+}
+
+// validate checks that all required env vars have been provided.
+func (c *Config) validate() error {
+	var missing []string
+{{- if or (eq .DB "postgres-gorm") (eq .DB "postgres-sqlc") (eq .DB "postgres-raw")}}
+	if c.Database.Host == "" {
+		missing = append(missing, "DB_HOST")
+	}
+	if c.Database.User == "" {
+		missing = append(missing, "DB_USER")
+	}
+	if c.Database.Password == "" {
+		missing = append(missing, "DB_PASSWORD")
+	}
+	if c.Database.Database == "" {
+		missing = append(missing, "DB_NAME")
+	}
+{{- end}}
+	if len(missing) > 0 {
+		return fmt.Errorf("set these env vars: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}

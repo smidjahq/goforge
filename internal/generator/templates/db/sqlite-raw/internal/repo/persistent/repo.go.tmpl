@@ -1,0 +1,37 @@
+package persistent
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"os"
+
+	_ "github.com/mattn/go-sqlite3"
+)
+
+// DB wraps database/sql for SQLite via the mattn/go-sqlite3 driver.
+// Note: requires CGO (a C compiler must be available at build time).
+type DB struct {
+	Conn *sql.DB
+}
+
+// Connect opens a database/sql connection to SQLite.
+// Set DB_PATH to override the default database file path.
+func Connect(ctx context.Context) (*DB, error) {
+	path := getEnv("DB_PATH", "{{.Name}}.db")
+	db, err := sql.Open("sqlite3", path)
+	if err != nil {
+		return nil, fmt.Errorf("open sqlite: %w", err)
+	}
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("ping sqlite: %w", err)
+	}
+	return &DB{Conn: db}, nil
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

@@ -1,0 +1,33 @@
+package handler
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"{{.Module}}/internal/usecase"
+)
+
+// PostHandler handles HTTP requests that delegate to an external API.
+type PostHandler struct {
+	svc *usecase.PostService
+}
+
+// NewPostHandler creates a PostHandler backed by the given service.
+func NewPostHandler(svc *usecase.PostService) *PostHandler {
+	return &PostHandler{svc: svc}
+}
+
+// List handles GET /api/v1/posts.
+// It fetches posts from the external API via the service layer.
+func (h *PostHandler) List(w http.ResponseWriter, r *http.Request) {
+	posts, err := h.svc.ListPosts(r.Context())
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadGateway)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(posts)
+}

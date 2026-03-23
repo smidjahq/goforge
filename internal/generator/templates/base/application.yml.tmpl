@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+log:
+  level: info
+{{- if or (eq .DB "postgres-gorm") (eq .DB "postgres-sqlc") (eq .DB "postgres-raw")}}
+
+database:
+  port: 5432
+  ssl_mode: disable
+{{- end}}
+{{- if or (eq .DB "sqlite-gorm") (eq .DB "sqlite-raw")}}
+
+database:
+  path: ./data.db
+{{- end}}

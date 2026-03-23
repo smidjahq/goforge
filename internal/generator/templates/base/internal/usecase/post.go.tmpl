@@ -1,0 +1,23 @@
+package usecase
+
+import (
+	"context"
+
+	"{{.Module}}/internal/repo/webapi"
+)
+
+// PostService fetches posts from an external API and applies any business
+// rules before returning them to the controller layer.
+type PostService struct {
+	api *webapi.Client
+}
+
+// NewPostService creates a new PostService backed by the given webapi Client.
+func NewPostService(api *webapi.Client) *PostService {
+	return &PostService{api: api}
+}
+
+// ListPosts returns all posts from the external API.
+func (s *PostService) ListPosts(ctx context.Context) ([]webapi.Post, error) {
+	return s.api.GetPosts(ctx)
+}

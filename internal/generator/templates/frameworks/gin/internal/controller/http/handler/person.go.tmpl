@@ -1,0 +1,54 @@
+package handler
+{{- if ne .DB "none"}}
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+
+	"{{.Module}}/internal/usecase"
+)
+
+// PersonHandler handles HTTP requests for the Person resource.
+type PersonHandler struct {
+	svc *usecase.PersonService
+}
+
+// NewPersonHandler creates a PersonHandler backed by the given service.
+func NewPersonHandler(svc *usecase.PersonService) *PersonHandler {
+	return &PersonHandler{svc: svc}
+}
+
+type createPersonRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+// Create handles POST /api/v1/persons.
+// It validates the request body and delegates creation to the service layer.
+func (h *PersonHandler) Create(c *gin.Context) {
+	var req createPersonRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	person, err := h.svc.Create(c.Request.Context(), req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, person)
+}
+
+// List handles GET /api/v1/persons.
+func (h *PersonHandler) List(c *gin.Context) {
+	persons, err := h.svc.List(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, persons)
+}
+{{- end}}
