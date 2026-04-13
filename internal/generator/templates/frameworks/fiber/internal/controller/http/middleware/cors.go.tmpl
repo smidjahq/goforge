@@ -1,0 +1,16 @@
+package middleware
+
+import (
+	"github.com/gofiber/fiber/v2"
+	fibercors "github.com/gofiber/fiber/v2/middleware/cors"
+)
+
+// CORS returns a Fiber middleware that sets permissive CORS headers.
+// Restrict origins, methods, and headers before going to production.
+func CORS() fiber.Handler {
+	return fibercors.New(fibercors.Config{
+		AllowOrigins: "*",
+		AllowMethods: "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+		AllowHeaders: "Origin,Content-Type,Accept,Authorization",
+	})
+}

@@ -1,0 +1,119 @@
+# {{.Name}}
+
+> _Add a one-line description of your project here._
+
+---
+
+## Stack
+
+| Layer     | Choice            |
+|-----------|-------------------|
+| Framework | {{.Framework}}    |
+| Database  | {{.DB}}           |
+| Logger    | {{.Logger}}       |
+{{- if .Extras}}
+| Extras    | {{range $i, $e := .Extras}}{{if $i}}, {{end}}{{$e}}{{end}} |
+{{- end}}
+
+---
+
+## Prerequisites
+
+- [Go {{if .GoVersion}}{{.GoVersion}}{{else}}1.23{{end}}+](https://go.dev/dl/)
+{{- if or (eq .DB "postgres-gorm") (eq .DB "postgres-sqlc") (eq .DB "postgres-raw")}}
+- [Docker](https://docs.docker.com/get-docker/) — for running a local PostgreSQL instance, or provide your own
+{{- end}}
+{{- if or (eq .DB "mysql-gorm") (eq .DB "mysql-raw") (eq .DB "mysql-sqlc")}}
+- [Docker](https://docs.docker.com/get-docker/) — for running a local MySQL instance, or provide your own
+{{- end}}
+{{- if or (eq .DB "postgres-sqlc") (eq .DB "mysql-sqlc")}}
+- [sqlc](https://sqlc.dev/) — `go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest`
+{{- end}}
+{{- if hasExtra .Extras "migrations"}}
+- [golang-migrate](https://github.com/golang-migrate/migrate) — `go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest`
+{{- end}}
+{{- if hasExtra .Extras "linter"}}
+- [golangci-lint](https://golangci-lint.run/usage/install/)
+{{- end}}
+
+---
+
+## Getting Started
+
+```bash
+cp .env.example .env
+{{- if or (eq .DB "postgres-gorm") (eq .DB "postgres-sqlc") (eq .DB "postgres-raw") (eq .DB "mysql-gorm") (eq .DB "mysql-raw") (eq .DB "mysql-sqlc")}}
+# Edit .env with your DB credentials, then:
+{{- end}}
+{{- if hasExtra .Extras "docker"}}
+docker compose up -d   # start database
+{{- end}}
+go mod tidy
+go run ./cmd/app
+```
+
+---
+
+## Project Structure
+
+```
+cmd/app/               # binary entrypoint
+internal/
+  app/                 # dependency wiring and server startup
+  entity/              # domain structs
+  usecase/             # business logic
+  controller/http/     # HTTP handlers, router, middleware
+  repo/
+    persistent/        # DB layer
+    webapi/            # external HTTP calls
+pkg/
+  logger/              # Logger interface + implementation
+  client/              # shared HTTP client
+  constants/           # application-wide constants
+  utils/               # shared utilities
+config/                # config loader (Viper + godotenv)
+```
+
+---
+
+## Running Tests
+
+```bash
+go test ./... -race -count=1
+```
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in the values.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SERVER_PORT` | HTTP server port | `8080` |
+| `VERSION` | Application version | `v0.1.0` |
+| `LOG_LEVEL` | Log level (`debug`, `info`, `warn`, `error`) | `info` |
+{{- if or (eq .DB "postgres-gorm") (eq .DB "postgres-sqlc") (eq .DB "postgres-raw")}}
+| `DB_HOST` | PostgreSQL host | `localhost` |
+| `DB_PORT` | PostgreSQL port | `5432` |
+| `DB_USER` | PostgreSQL user | `postgres` |
+| `DB_PASSWORD` | PostgreSQL password | — |
+| `DB_NAME` | Database name | `{{.Name}}` |
+| `DB_SSL_MODE` | SSL mode (`disable`, `require`) | `disable` |
+{{- end}}
+{{- if or (eq .DB "sqlite-gorm") (eq .DB "sqlite-raw")}}
+| `DB_PATH` | SQLite file path | `./data.db` |
+{{- end}}
+{{- if or (eq .DB "mysql-gorm") (eq .DB "mysql-raw") (eq .DB "mysql-sqlc")}}
+| `DB_HOST` | MySQL host | `localhost` |
+| `DB_PORT` | MySQL port | `3306` |
+| `DB_USER` | MySQL user | `root` |
+| `DB_PASSWORD` | MySQL password | — |
+| `DB_NAME` | Database name | `{{.Name}}` |
+{{- end}}
+
+---
+
+## License
+
+MIT

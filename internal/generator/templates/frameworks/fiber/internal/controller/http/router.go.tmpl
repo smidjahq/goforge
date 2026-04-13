@@ -1,0 +1,43 @@
+package controller
+
+import (
+{{- $hasDB := ne .DB "none"}}
+	"github.com/gofiber/fiber/v2"
+	fiberre "github.com/gofiber/fiber/v2/middleware/recover"
+
+	handler "{{.Module}}/internal/controller/http/handler"
+	mw "{{.Module}}/internal/controller/http/middleware"
+	"{{.Module}}/internal/usecase"
+	"{{.Module}}/pkg/logger"
+)
+
+// NewRouter builds and returns the Fiber app with all routes registered.
+func NewRouter(log logger.Logger{{if $hasDB}}, personSvc *usecase.PersonService{{end}}, postSvc *usecase.PostService) *fiber.App {
+	app := fiber.New(fiber.Config{DisableStartupMessage: true})
+	app.Use(fiberre.New())
+	app.Use(mw.Logger(log))
+	app.Use(mw.CORS())
+
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"service": "{{.Name}}",
+			"version": "0.1.0",
+			"status":  "running",
+		})
+	})
+
+	app.Get("/healthz", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
+
+	api := app.Group("/api/v1")
+{{- if $hasDB}}
+	personH := handler.NewPersonHandler(personSvc)
+	api.Post("/persons", personH.Create)
+	api.Get("/persons", personH.List)
+{{- end}}
+	postH := handler.NewPostHandler(postSvc)
+	api.Get("/posts", postH.List)
+
+	return app
+}

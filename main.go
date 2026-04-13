@@ -16,6 +16,7 @@ with Clean Architecture, your choice of HTTP framework, database layer, and logg
 	}
 	root.AddCommand(newCreateCmd())
 	root.AddCommand(newVersionCmd())
+	root.AddCommand(newListCmd())
 	return root
 }
 

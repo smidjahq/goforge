@@ -10,6 +10,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -62,6 +64,39 @@ func layerMessage(layer string) string {
 	default:
 		return "Processing " + layer
 	}
+}
+
+// ListFiles returns the relative paths of all files that would be generated for
+// cfg, in the order they would be written. Later layers may overwrite paths
+// from earlier layers; the returned slice reflects the final de-duplicated set,
+// sorted alphabetically.
+func ListFiles(cfg config.Config) []string {
+	seen := make(map[string]struct{})
+	var ordered []string
+
+	for _, layer := range activeLayers(cfg) {
+		_ = fs.WalkDir(templateFS, layer, func(fsPath string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			rel, err := filepath.Rel(filepath.FromSlash(layer), filepath.FromSlash(fsPath))
+			if err != nil {
+				return nil
+			}
+			if strings.HasSuffix(rel, ".tmpl") {
+				rel = strings.TrimSuffix(rel, ".tmpl")
+			}
+			rel = filepath.ToSlash(rel)
+			if _, exists := seen[rel]; !exists {
+				seen[rel] = struct{}{}
+				ordered = append(ordered, rel)
+			}
+			return nil
+		})
+	}
+
+	sort.Strings(ordered)
+	return ordered
 }
 
 // activeLayers returns the ordered list of template layer paths to apply for cfg.
@@ -128,9 +163,16 @@ func renderTemplate(cfg config.Config, fsPath, dst string) error {
 		return fmt.Errorf("read template %q: %w", fsPath, err)
 	}
 
+	funcMap := template.FuncMap{
+		// hasExtra reports whether name is present in the extras slice.
+		"hasExtra": func(extras []string, name string) bool {
+			return slices.Contains(extras, name)
+		},
+	}
+
 	// Use the filename (without directory) as the template name.
 	name := path.Base(fsPath)
-	tmpl, err := template.New(name).Parse(string(raw))
+	tmpl, err := template.New(name).Funcs(funcMap).Parse(string(raw))
 	if err != nil {
 		return fmt.Errorf("parse template %q: %w", fsPath, err)
 	}

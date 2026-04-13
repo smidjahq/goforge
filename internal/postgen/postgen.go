@@ -35,10 +35,16 @@ func ModTidy(outputPath string) error {
 	return nil
 }
 
-// GitInit runs `git init` in outputPath.
+// GitInit runs `git init` in outputPath. It is a no-op when outputPath is
+// already inside an existing git repository, so nested repos are never created.
 func GitInit(outputPath string) error {
 	if _, err := exec.LookPath("git"); err != nil {
 		return fmt.Errorf("git not found in PATH: %w", err)
+	}
+	// Skip when already inside a git repository.
+	check := exec.Command("git", "-C", outputPath, "rev-parse", "--is-inside-work-tree")
+	if check.Run() == nil {
+		return nil
 	}
 	cmd := exec.Command("git", "init")
 	cmd.Dir = outputPath

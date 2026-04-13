@@ -1,0 +1,27 @@
+package handler
+
+import (
+	"github.com/gofiber/fiber/v2"
+
+	"{{.Module}}/internal/usecase"
+)
+
+// PostHandler handles HTTP requests that delegate to an external API.
+type PostHandler struct {
+	svc *usecase.PostService
+}
+
+// NewPostHandler creates a PostHandler backed by the given service.
+func NewPostHandler(svc *usecase.PostService) *PostHandler {
+	return &PostHandler{svc: svc}
+}
+
+// List handles GET /api/v1/posts.
+func (h *PostHandler) List(c *fiber.Ctx) error {
+	posts, err := h.svc.ListPosts(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(posts)
+}

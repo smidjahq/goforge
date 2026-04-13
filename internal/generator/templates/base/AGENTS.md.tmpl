@@ -1,0 +1,329 @@
+# {{.Name}} — Agent Guide
+
+This file is the authoritative reference for AI coding agents (Claude Code, Codex, Cursor, Gemini CLI, etc.) working in this repository.
+
+---
+
+## Stack
+
+| Layer     | Choice            |
+|-----------|-------------------|
+| Framework | {{.Framework}}    |
+| Database  | {{.DB}}           |
+| Logger    | {{.Logger}}       |
+{{- if .Extras}}
+| Extras    | {{range $i, $e := .Extras}}{{if $i}}, {{end}}{{$e}}{{end}} |
+{{- end}}
+
+---
+
+## Commands
+
+```bash
+# Run the server
+go run ./cmd/app
+
+# Build binary
+go build -o {{.Name}} ./cmd/app
+
+# Run tests
+go test ./... -race -count=1
+{{- if hasExtra .Extras "linter"}}
+
+# Lint
+golangci-lint run ./...
+{{- end}}
+{{- if hasExtra .Extras "docker"}}
+
+# Database (Docker)
+docker compose up -d
+docker compose down
+{{- end}}
+{{- if hasExtra .Extras "migrations"}}
+
+# Migrations
+migrate -path migrations/ -database "$DATABASE_URL" up
+migrate -path migrations/ -database "$DATABASE_URL" down 1
+{{- end}}
+```
+{{- if hasExtra .Extras "makefile"}}
+
+> **Shortcut:** `make help` lists all available targets.
+{{- end}}
+
+---
+
+## Architecture
+
+This project uses Clean Architecture. Data flows strictly inward:
+
+```
+cmd/app/
+  main.go               → binary entrypoint; calls app.Run()
+
+internal/app/
+  app.go                → dependency wiring and server startup
+
+internal/entity/
+  *.go                  → domain structs; no framework or DB imports
+
+internal/usecase/
+  *.go                  → business logic; depends only on entity types and repo interfaces
+
+internal/controller/http/
+  router.go             → route registration
+  handler/              → HTTP handlers; call usecases, write JSON responses
+  middleware/           → logger and CORS middleware
+
+internal/repo/
+  persistent/           → DB layer; implements repo interfaces defined in usecase files
+  webapi/               → external HTTP calls
+
+pkg/
+  logger/               → Logger interface + {{.Logger}} implementation
+  client/               → shared HTTP client
+  constants/            → application-wide constants
+  utils/                → shared utilities
+
+config/
+  config.go             → Viper config loader
+```
+
+**Rule:** handlers call usecases; usecases call repos. Nothing crosses layers in the other direction.
+
+---
+
+## Key Conventions
+
+- **Logger:** Always import `{{.Module}}/pkg/logger`. Never import a concrete logger (`go.uber.org/zap`, `github.com/rs/zerolog`, etc.) outside of `pkg/logger/`.
+{{- if or (eq .DB "postgres-gorm") (eq .DB "sqlite-gorm") (eq .DB "mysql-gorm")}}
+- **Entities:** Domain structs live in `internal/entity/`. GORM struct tags (`gorm:"..."`) are applied directly on entity fields.
+{{- else}}
+- **Entities:** Domain structs live in `internal/entity/`. They carry no DB-layer imports or tags.
+{{- end}}
+- **Config:** Application config is loaded from `application.yml` and `.env` via Viper and godotenv. Add new keys to both files.
+- **Repo interfaces:** Each usecase file defines the repo interface it needs. The concrete implementation lives in `internal/repo/persistent/`. Never import a concrete repo type from a usecase.
+
+---
+
+## Extending the Project
+
+### Add a new entity (e.g. `Order`)
+
+**1. Create the domain struct** at `internal/entity/order.go`:
+
+```go
+package entity
+
+type Order struct {
+	ID     int64
+	UserID int64
+	Total  float64
+}
+```
+{{- if ne .DB "none"}}
+
+**2. Create the repo** at `internal/repo/persistent/order_repo.go`:
+{{- if or (eq .DB "postgres-gorm") (eq .DB "sqlite-gorm") (eq .DB "mysql-gorm")}}
+
+```go
+package persistent
+
+import (
+	"{{.Module}}/internal/entity"
+	"gorm.io/gorm"
+)
+
+type OrderRepo struct{ db *gorm.DB }
+
+func NewOrderRepo(db *gorm.DB) *OrderRepo { return &OrderRepo{db: db} }
+
+func (r *OrderRepo) GetByID(id int64) (*entity.Order, error) {
+	var o entity.Order
+	return &o, r.db.First(&o, id).Error
+}
+
+func (r *OrderRepo) Save(o *entity.Order) error {
+	return r.db.Save(o).Error
+}
+```
+{{- end}}
+{{- if or (eq .DB "postgres-sqlc") (eq .DB "mysql-sqlc")}}
+
+Write SQL in `internal/repo/persistent/queries/order.sql`:
+
+```sql
+-- name: GetOrder :one
+SELECT * FROM orders WHERE id = $1;
+
+-- name: CreateOrder :one
+INSERT INTO orders (user_id, total) VALUES ($1, $2) RETURNING *;
+```
+
+Then run `sqlc generate` and implement the generated interface in `order_repo.go`.
+{{- end}}
+{{- if or (eq .DB "postgres-raw") (eq .DB "sqlite-raw") (eq .DB "mysql-raw")}}
+
+```go
+package persistent
+
+import (
+	"context"
+	"database/sql"
+	"{{.Module}}/internal/entity"
+)
+
+type OrderRepo struct{ db *sql.DB }
+
+func NewOrderRepo(db *sql.DB) *OrderRepo { return &OrderRepo{db: db} }
+
+func (r *OrderRepo) GetByID(ctx context.Context, id int64) (*entity.Order, error) {
+	var o entity.Order
+	row := r.db.QueryRowContext(ctx,
+		"SELECT id, user_id, total FROM orders WHERE id = $1", id)
+	return &o, row.Scan(&o.ID, &o.UserID, &o.Total)
+}
+```
+{{- end}}
+{{- end}}
+
+**{{if ne .DB "none"}}3{{else}}2{{end}}. Create the usecase** at `internal/usecase/order.go`:
+
+```go
+package usecase
+
+import "{{.Module}}/internal/entity"
+
+type OrderRepo interface {
+	GetByID(id int64) (*entity.Order, error)
+}
+
+type OrderUseCase struct{ repo OrderRepo }
+
+func NewOrderUseCase(r OrderRepo) *OrderUseCase { return &OrderUseCase{repo: r} }
+
+func (uc *OrderUseCase) Get(id int64) (*entity.Order, error) {
+	return uc.repo.GetByID(id)
+}
+```
+
+**{{if ne .DB "none"}}4{{else}}3{{end}}. Wire in `internal/app/app.go`** — initialise the repo, pass it to the usecase constructor, and pass the usecase to the handler.
+
+---
+
+### Add a new HTTP endpoint
+
+**1. Add a handler method** in `internal/controller/http/handler/`:
+{{- if eq .Framework "gin"}}
+
+```go
+func (h *Handler) GetOrder(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	order, err := h.orderUseCase.Get(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, order)
+}
+```
+{{- end}}
+{{- if eq .Framework "chi"}}
+
+```go
+func (h *Handler) GetOrder(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	order, err := h.orderUseCase.Get(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	json.NewEncoder(w).Encode(order)
+}
+```
+{{- end}}
+{{- if eq .Framework "echo"}}
+
+```go
+func (h *Handler) GetOrder(c echo.Context) error {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	order, err := h.orderUseCase.Get(id)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, map[string]string{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, order)
+}
+```
+{{- end}}
+{{- if eq .Framework "fiber"}}
+
+```go
+func (h *Handler) GetOrder(c *fiber.Ctx) error {
+	id, _ := strconv.ParseInt(c.Params("id"), 10, 64)
+	order, err := h.orderUseCase.Get(id)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(order)
+}
+```
+{{- end}}
+
+**2. Register the route** in `internal/controller/http/router.go`:
+{{- if eq .Framework "gin"}}
+
+```go
+r.GET("/orders/:id", h.GetOrder)
+```
+{{- end}}
+{{- if eq .Framework "chi"}}
+
+```go
+r.Get("/orders/{id}", h.GetOrder)
+```
+{{- end}}
+{{- if eq .Framework "echo"}}
+
+```go
+e.GET("/orders/:id", h.GetOrder)
+```
+{{- end}}
+{{- if eq .Framework "fiber"}}
+
+```go
+app.Get("/orders/:id", h.GetOrder)
+```
+{{- end}}
+
+---
+
+### Logger usage
+{{- if eq .Logger "slog"}}
+
+```go
+// Structured key-value pairs
+logger.Info("order fetched", "order_id", id)
+logger.Warn("slow query", "duration_ms", elapsed)
+logger.Error("fetch failed", "error", err)
+```
+{{- end}}
+{{- if eq .Logger "zap"}}
+
+```go
+// Typed fields for zero-allocation logging
+logger.Info("order fetched", zap.Int64("order_id", id))
+logger.Warn("slow query", zap.Duration("duration", elapsed))
+logger.Error("fetch failed", zap.Error(err))
+```
+{{- end}}
+{{- if eq .Logger "zerolog"}}
+
+```go
+// Chain builder — always call .Msg() or .Send() at the end
+logger.Info().Int64("order_id", id).Msg("order fetched")
+logger.Warn().Dur("duration", elapsed).Msg("slow query")
+logger.Error().Err(err).Msg("fetch failed")
+```
+{{- end}}
+
+Import the logger via the interface: `"{{.Module}}/pkg/logger"` — never import the concrete library directly.

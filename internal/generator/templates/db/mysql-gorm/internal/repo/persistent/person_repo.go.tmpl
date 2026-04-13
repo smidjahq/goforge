@@ -1,0 +1,36 @@
+package persistent
+
+import (
+	"context"
+	"fmt"
+
+	"{{.Module}}/internal/entity"
+)
+
+// PersonRepo implements usecase.PersonRepo using GORM.
+type PersonRepo struct {
+	db *DB
+}
+
+// NewPersonRepo creates a PersonRepo backed by the given database connection.
+func NewPersonRepo(db *DB) *PersonRepo {
+	return &PersonRepo{db: db}
+}
+
+// Create inserts a new Person and returns the persisted record.
+func (r *PersonRepo) Create(ctx context.Context, name string) (*entity.Person, error) {
+	p := &entity.Person{Name: name}
+	if err := r.db.Conn.WithContext(ctx).Create(p).Error; err != nil {
+		return nil, fmt.Errorf("create person: %w", err)
+	}
+	return p, nil
+}
+
+// FindAll returns all non-deleted Person records ordered by ID.
+func (r *PersonRepo) FindAll(ctx context.Context) ([]*entity.Person, error) {
+	var persons []*entity.Person
+	if err := r.db.Conn.WithContext(ctx).Order("id").Find(&persons).Error; err != nil {
+		return nil, fmt.Errorf("find persons: %w", err)
+	}
+	return persons, nil
+}

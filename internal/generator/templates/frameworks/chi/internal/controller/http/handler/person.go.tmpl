@@ -1,5 +1,8 @@
 package handler
-{{- if ne .DB "none"}}
+{{- if eq .DB "none"}}
+
+// No person handler is generated when DB is set to "none".
+{{- else}}
 
 import (
 	"encoding/json"

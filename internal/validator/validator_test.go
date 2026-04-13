@@ -29,6 +29,8 @@ func TestValidate_ValidCombinations(t *testing.T) {
 		{"gin+postgres-gorm+zap", func() config.Config { c := base(); c.Logger = "zap"; return c }()},
 		{"gin+postgres-gorm+zerolog", func() config.Config { c := base(); c.Logger = "zerolog"; return c }()},
 		{"chi+postgres-gorm+slog", func() config.Config { c := base(); c.Framework = "chi"; return c }()},
+		{"echo+postgres-gorm+slog", func() config.Config { c := base(); c.Framework = "echo"; return c }()},
+		{"fiber+postgres-gorm+slog", func() config.Config { c := base(); c.Framework = "fiber"; return c }()},
 
 		// All valid postgres DB combos
 		{"postgres-gorm", base()},
@@ -38,6 +40,11 @@ func TestValidate_ValidCombinations(t *testing.T) {
 		// All valid sqlite DB combos
 		{"sqlite-gorm", func() config.Config { c := base(); c.DB = "sqlite-gorm"; return c }()},
 		{"sqlite-raw", func() config.Config { c := base(); c.DB = "sqlite-raw"; return c }()},
+
+		// All valid MySQL DB combos
+		{"mysql-gorm", func() config.Config { c := base(); c.DB = "mysql-gorm"; return c }()},
+		{"mysql-sqlc", func() config.Config { c := base(); c.DB = "mysql-sqlc"; return c }()},
+		{"mysql-raw", func() config.Config { c := base(); c.DB = "mysql-raw"; return c }()},
 
 		// none DB
 		{"none", func() config.Config { c := base(); c.DB = "none"; return c }()},
@@ -96,21 +103,15 @@ func TestValidate_InvalidCombinations(t *testing.T) {
 
 		// Invalid framework
 		{
+			name:        "empty framework",
+			cfg:         func() config.Config { c := base(); c.Framework = ""; return c }(),
+			errContains: "framework is required",
+		},
+		{
 			name:        "unknown framework",
 			cfg:         func() config.Config { c := base(); c.Framework = "express"; return c }(),
 			errContains: `unknown framework "express"`,
 		},
-		{
-			name:        "echo not yet selectable",
-			cfg:         func() config.Config { c := base(); c.Framework = "echo"; return c }(),
-			errContains: `unknown framework "echo"`,
-		},
-		{
-			name:        "fiber not yet selectable",
-			cfg:         func() config.Config { c := base(); c.Framework = "fiber"; return c }(),
-			errContains: `unknown framework "fiber"`,
-		},
-
 		// Invalid DB combos
 		{
 			name:        "sqlite-sqlc unsupported",
@@ -119,8 +120,8 @@ func TestValidate_InvalidCombinations(t *testing.T) {
 		},
 		{
 			name:        "unknown backend",
-			cfg:         func() config.Config { c := base(); c.DB = "mysql-gorm"; return c }(),
-			errContains: `unknown database backend "mysql"`,
+			cfg:         func() config.Config { c := base(); c.DB = "oracle-gorm"; return c }(),
+			errContains: `unknown database backend "oracle"`,
 		},
 		{
 			name:        "malformed db no dash",
@@ -180,7 +181,7 @@ func TestValidOptionsFor(t *testing.T) {
 		{"postgres", []string{"gorm", "sqlc", "raw"}, false},
 		{"sqlite", []string{"gorm", "raw"}, false},
 		{"none", []string{}, false},
-		{"mysql", nil, true},
+		{"mysql", []string{"gorm", "sqlc", "raw"}, false},
 		{"", nil, true},
 	}
 

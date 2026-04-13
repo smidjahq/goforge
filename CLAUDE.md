@@ -73,7 +73,7 @@ Then add integration tests in the matching `internal/generator/*_test.go` file. 
 - DB value format: `"<backend>-<layer>"` (e.g. `postgres-gorm`) or `"none"`
 - SQLite does **not** support `sqlc` — only `gorm` and `raw`
 - The `migrations` extra is invalid when `db=none` (enforced in both validator and TUI)
-- Echo and Fiber have template folders but are **not** registered in the validator yet
+- Echo and Fiber are fully registered in the validator and have complete template trees; what remains is verifying compilation with real builds (`TestGenerate_FrameworkBuilds` covers this)
 
 ### Test patterns
 

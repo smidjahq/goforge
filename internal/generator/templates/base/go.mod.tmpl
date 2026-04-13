@@ -1,12 +1,15 @@
 module {{.Module}}
 
-go 1.26
+go {{if .GoVersion}}{{.GoVersion}}{{else}}1.23{{end}}
 {{- $pgGorm := eq .DB "postgres-gorm"}}
 {{- $pgSqlc := eq .DB "postgres-sqlc"}}
 {{- $pgRaw  := eq .DB "postgres-raw"}}
 {{- $sqGorm := eq .DB "sqlite-gorm"}}
 {{- $sqRaw  := eq .DB "sqlite-raw"}}
-{{- $hasGorm := or $pgGorm $sqGorm}}
+{{- $myGorm := eq .DB "mysql-gorm"}}
+{{- $myRaw  := eq .DB "mysql-raw"}}
+{{- $mySqlc := eq .DB "mysql-sqlc"}}
+{{- $hasGorm := or $pgGorm $sqGorm $myGorm}}
 {{- $hasPgx  := or $pgSqlc $pgRaw}}
 
 require (
@@ -17,6 +20,12 @@ require (
 {{- end}}
 {{- if eq .Framework "chi"}}
 	github.com/go-chi/chi/v5 v5.2.1
+{{- end}}
+{{- if eq .Framework "echo"}}
+	github.com/labstack/echo/v4 v4.13.3
+{{- end}}
+{{- if eq .Framework "fiber"}}
+	github.com/gofiber/fiber/v2 v2.52.6
 {{- end}}
 {{- if $hasGorm}}
 	gorm.io/gorm v1.25.12
@@ -32,6 +41,12 @@ require (
 {{- end}}
 {{- if $sqRaw}}
 	github.com/mattn/go-sqlite3 v1.14.24
+{{- end}}
+{{- if $myGorm}}
+	gorm.io/driver/mysql v1.5.7
+{{- end}}
+{{- if or $myRaw $mySqlc}}
+	github.com/go-sql-driver/mysql v1.8.1
 {{- end}}
 {{- if eq .Logger "zap"}}
 	go.uber.org/zap v1.27.0

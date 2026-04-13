@@ -1,0 +1,46 @@
+package controller
+
+import (
+	"net/http"
+{{- $hasDB := ne .DB "none"}}
+
+	"github.com/labstack/echo/v4"
+	echomw "github.com/labstack/echo/v4/middleware"
+
+	handler "{{.Module}}/internal/controller/http/handler"
+	mw "{{.Module}}/internal/controller/http/middleware"
+	"{{.Module}}/internal/usecase"
+	"{{.Module}}/pkg/logger"
+)
+
+// NewRouter builds and returns the Echo HTTP handler with all routes registered.
+func NewRouter(log logger.Logger{{if $hasDB}}, personSvc *usecase.PersonService{{end}}, postSvc *usecase.PostService) http.Handler {
+	e := echo.New()
+	e.HideBanner = true
+	e.Use(echomw.Recover())
+	e.Use(mw.Logger(log))
+	e.Use(mw.CORS())
+
+	e.GET("/", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
+			"service": "{{.Name}}",
+			"version": "0.1.0",
+			"status":  "running",
+		})
+	})
+
+	e.GET("/healthz", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	})
+
+	api := e.Group("/api/v1")
+{{- if $hasDB}}
+	personH := handler.NewPersonHandler(personSvc)
+	api.POST("/persons", personH.Create)
+	api.GET("/persons", personH.List)
+{{- end}}
+	postH := handler.NewPostHandler(postSvc)
+	api.GET("/posts", postH.List)
+
+	return e
+}

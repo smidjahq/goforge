@@ -1,0 +1,63 @@
+package persistent
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"{{.Module}}/internal/entity"
+)
+
+// PersonRepo is a pre-generation scaffold that uses raw database/sql until you
+// run `sqlc generate`. After generation:
+//  1. Delete (or empty) this file.
+//  2. Instantiate the generated `Queries` struct via `New(db.Conn)` in repo.go.
+//  3. Replace method bodies with the generated calls (e.g. q.CreatePerson, q.ListPersons).
+//
+// The generated files are placed in this same package by sqlc (see sqlc.yaml).
+type PersonRepo struct {
+	db *DB
+}
+
+// NewPersonRepo creates a PersonRepo backed by the given database connection.
+func NewPersonRepo(db *DB) *PersonRepo {
+	return &PersonRepo{db: db}
+}
+
+// Create inserts a new Person and returns the persisted record.
+func (r *PersonRepo) Create(ctx context.Context, name string) (*entity.Person, error) {
+	now := time.Now().UTC()
+	res, err := r.db.Conn.ExecContext(ctx,
+		`INSERT INTO persons (name, created_at, updated_at) VALUES (?, ?, ?)`,
+		name, now, now,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("create person: %w", err)
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("get last insert id: %w", err)
+	}
+	return &entity.Person{ID: id, Name: name, CreatedAt: now, UpdatedAt: now}, nil
+}
+
+// FindAll returns all Person records ordered by ID.
+func (r *PersonRepo) FindAll(ctx context.Context) ([]*entity.Person, error) {
+	rows, err := r.db.Conn.QueryContext(ctx,
+		`SELECT id, name, created_at, updated_at FROM persons ORDER BY id`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list persons: %w", err)
+	}
+	defer rows.Close()
+
+	var persons []*entity.Person
+	for rows.Next() {
+		var p entity.Person
+		if err := rows.Scan(&p.ID, &p.Name, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan person: %w", err)
+		}
+		persons = append(persons, &p)
+	}
+	return persons, rows.Err()
+}

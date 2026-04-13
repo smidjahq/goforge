@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/smidjahq/goforge/internal/config"
+	"github.com/smidjahq/goforge/internal/goversion"
 	"github.com/smidjahq/goforge/internal/validator"
 )
 
@@ -32,6 +33,7 @@ func Run() (config.Config, error) {
 		dbLayer   string
 		loggerVal string
 		extras    []string
+		goVersion = goversion.Default()
 	)
 
 	theme := buildTheme()
@@ -61,6 +63,11 @@ func Run() (config.Config, error) {
 					return nil
 				}).
 				Value(&module),
+
+			huh.NewInput().
+				Title("Go version").
+				Placeholder(goVersion).
+				Value(&goVersion),
 		),
 	).WithTheme(theme).Run(); err != nil {
 		return config.Config{}, err
@@ -75,6 +82,8 @@ func Run() (config.Config, error) {
 				Options(
 					huh.NewOption("Gin", "gin"),
 					huh.NewOption("Chi", "chi"),
+					huh.NewOption("Echo (labstack/echo)", "echo"),
+					huh.NewOption("Fiber (gofiber/fiber)", "fiber"),
 				).
 				Value(&framework),
 
@@ -83,6 +92,7 @@ func Run() (config.Config, error) {
 				Options(
 					huh.NewOption("PostgreSQL", "postgres"),
 					huh.NewOption("SQLite", "sqlite"),
+					huh.NewOption("MySQL / MariaDB", "mysql"),
 					huh.NewOption("None (no database)", "none"),
 				).
 				Value(&dbBackend),
@@ -138,6 +148,7 @@ func Run() (config.Config, error) {
 		DB:        db,
 		Logger:    loggerVal,
 		Extras:    extras,
+		GoVersion: strings.TrimSpace(goVersion),
 	}
 
 	if err := validator.Validate(cfg); err != nil {
@@ -243,6 +254,7 @@ func extrasOptions() []huh.Option[string] {
 		huh.NewOption("Linter  (.golangci.yml)", "linter"),
 	}
 }
+
 
 // buildDB combines backend and layer into the Config.DB format.
 func buildDB(backend, layer string) string {
