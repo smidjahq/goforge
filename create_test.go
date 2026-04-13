@@ -94,6 +94,26 @@ func TestCreateCmd_InvalidFlags(t *testing.T) {
 			wantErr: "project name is required",
 		},
 		{
+			name: "missing module",
+			args: []string{"create",
+				"--name", "myapp",
+				"--framework", "gin",
+				"--db", "postgres-gorm",
+				"--logger", "slog",
+			},
+			wantErr: "module path is required",
+		},
+		{
+			name: "empty framework",
+			args: []string{"create",
+				"--name", "myapp",
+				"--module", "github.com/you/myapp",
+				"--db", "postgres-gorm",
+				"--logger", "slog",
+			},
+			wantErr: "framework is required",
+		},
+		{
 			name: "invalid db combo sqlite-sqlc",
 			args: []string{"create",
 				"--name", "myapp",
@@ -221,7 +241,7 @@ func TestPrintNextSteps_GoRunWhenNoMakefile(t *testing.T) {
 	root.SetOut(&buf)
 
 	cfg := minimalCfg()
-	printNextSteps(root, cfg)
+	printNextSteps(root, cfg, cfg.Name)
 
 	if !strings.Contains(buf.String(), "go run ./cmd/app") {
 		t.Errorf("expected go run fallback, got: %q", buf.String())
@@ -235,7 +255,7 @@ func TestPrintNextSteps_MakeRunWhenMakefile(t *testing.T) {
 
 	cfg := minimalCfg()
 	cfg.Extras = []string{"makefile"}
-	printNextSteps(root, cfg)
+	printNextSteps(root, cfg, cfg.Name)
 
 	if !strings.Contains(buf.String(), "make run") {
 		t.Errorf("expected make run, got: %q", buf.String())
@@ -249,7 +269,7 @@ func TestPrintNextSteps_MakeComposeUpWhenMakefileAndDocker(t *testing.T) {
 
 	cfg := minimalCfg()
 	cfg.Extras = []string{"makefile", "docker"}
-	printNextSteps(root, cfg)
+	printNextSteps(root, cfg, cfg.Name)
 
 	out := buf.String()
 	if !strings.Contains(out, "make run") {
@@ -267,7 +287,7 @@ func TestPrintNextSteps_NoComposeUpWithoutDocker(t *testing.T) {
 
 	cfg := minimalCfg()
 	cfg.Extras = []string{"makefile"}
-	printNextSteps(root, cfg)
+	printNextSteps(root, cfg, cfg.Name)
 
 	if strings.Contains(buf.String(), "compose-up") {
 		t.Errorf("compose-up should not appear without docker extra, got: %q", buf.String())
@@ -280,7 +300,7 @@ func TestPrintNextSteps_ContainsCdProjectName(t *testing.T) {
 	root.SetOut(&buf)
 
 	cfg := minimalCfg()
-	printNextSteps(root, cfg)
+	printNextSteps(root, cfg, cfg.Name)
 
 	if !strings.Contains(buf.String(), "cd "+cfg.Name) {
 		t.Errorf("expected cd instruction, got: %q", buf.String())
@@ -298,10 +318,11 @@ func TestPrintSummary_AllFieldsPresent(t *testing.T) {
 
 	cfg := minimalCfg()
 	cfg.Extras = []string{"docker", "ci"}
+	cfg.GoVersion = "1.22"
 	printSummary(root, cfg)
 
 	out := buf.String()
-	for _, want := range []string{cfg.Name, cfg.Module, cfg.Framework, cfg.DB, cfg.Logger, "docker, ci"} {
+	for _, want := range []string{cfg.Name, cfg.Module, cfg.Framework, cfg.DB, cfg.Logger, "docker, ci", "1.22"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("summary missing %q; output: %q", want, out)
 		}
@@ -318,6 +339,57 @@ func TestPrintSummary_NoExtrasLabel(t *testing.T) {
 
 	if !strings.Contains(buf.String(), "(none)") {
 		t.Errorf("expected (none) for empty extras, got: %q", buf.String())
+	}
+}
+
+// ---------------------------------------------------------------------------
+// renderFileTree
+// ---------------------------------------------------------------------------
+
+func TestRenderFileTree_ContainsRootName(t *testing.T) {
+	out := renderFileTree("myapp", []string{"main.go"})
+	if !strings.Contains(out, "myapp") {
+		t.Errorf("expected root name in tree, got: %q", out)
+	}
+}
+
+func TestRenderFileTree_SingleFileAtRoot(t *testing.T) {
+	out := renderFileTree("proj", []string{"go.mod"})
+	if !strings.Contains(out, "go.mod") {
+		t.Errorf("expected go.mod in tree, got: %q", out)
+	}
+}
+
+func TestRenderFileTree_NestedPath(t *testing.T) {
+	out := renderFileTree("proj", []string{"cmd/app/main.go"})
+	for _, want := range []string{"cmd", "app", "main.go"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("tree missing %q; got: %q", want, out)
+		}
+	}
+}
+
+func TestRenderFileTree_LastChildUsesCornerConnector(t *testing.T) {
+	out := renderFileTree("proj", []string{"a.go", "b.go"})
+	// The last sibling must use "└──" not "├──"
+	if !strings.Contains(out, "└──") {
+		t.Errorf("expected corner connector └── for last child, got: %q", out)
+	}
+}
+
+func TestRenderFileTree_NonLastChildUsesBranchConnector(t *testing.T) {
+	out := renderFileTree("proj", []string{"a.go", "b.go", "c.go"})
+	// At least one non-last sibling must use "├──"
+	if !strings.Contains(out, "├──") {
+		t.Errorf("expected branch connector ├── for non-last child, got: %q", out)
+	}
+}
+
+func TestRenderFileTree_EmptyFiles(t *testing.T) {
+	// Should not panic on an empty file list.
+	out := renderFileTree("proj", []string{})
+	if !strings.Contains(out, "proj") {
+		t.Errorf("expected root name even with empty file list, got: %q", out)
 	}
 }
 

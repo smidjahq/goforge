@@ -1,0 +1,42 @@
+package persistent
+
+import (
+	"fmt"
+	"os"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+)
+
+// DB wraps the GORM database connection.
+type DB struct {
+	Conn *gorm.DB
+}
+
+// Connect opens a GORM connection to MySQL / MariaDB.
+// Set DATABASE_URL or the individual DB_* environment variables.
+func Connect() (*DB, error) {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+			getEnv("DB_USER", "mysql"),
+			getEnv("DB_PASSWORD", "mysql"),
+			getEnv("DB_HOST", "localhost"),
+			getEnv("DB_PORT", "3306"),
+			getEnv("DB_NAME", "{{.Name}}"),
+		)
+	}
+	conn, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("connect to mysql: %w", err)
+	}
+	return &DB{Conn: conn}, nil
+}
+
+func getEnv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

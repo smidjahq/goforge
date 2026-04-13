@@ -1,0 +1,12 @@
+// Package entity contains domain types for {{.Name}}.
+package entity
+
+import "time"
+
+// Person is the Person domain entity.
+type Person struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

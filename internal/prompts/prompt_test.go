@@ -83,7 +83,7 @@ func TestLayerOptions_None_ReturnsPlaceholder(t *testing.T) {
 }
 
 func TestLayerOptions_UnknownBackend_ReturnsPlaceholder(t *testing.T) {
-	opts := layerOptions("mysql")
+	opts := layerOptions("oracle")
 	// Unknown backends behave like "none" — a placeholder is returned
 	if len(opts) != 1 {
 		t.Fatalf("expected 1 placeholder option for unknown backend, got %d", len(opts))

@@ -118,6 +118,117 @@ func TestGenerate_NoneDB_NoRepoDirectory(t *testing.T) {
 	}
 }
 
+func TestGenerate_MysqlGorm_FileTree(t *testing.T) {
+	out := t.TempDir()
+	if err := generator.Generate(dbConfig("mysql-gorm"), out, nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	mustExist := []string{
+		"internal/repo/persistent/repo.go",
+		"docker-compose.yml",
+	}
+	for _, rel := range mustExist {
+		if _, err := os.Stat(filepath.Join(out, rel)); os.IsNotExist(err) {
+			t.Errorf("missing file: %s", rel)
+		}
+	}
+}
+
+func TestGenerate_MysqlRaw_FileTree(t *testing.T) {
+	out := t.TempDir()
+	if err := generator.Generate(dbConfig("mysql-raw"), out, nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	mustExist := []string{
+		"internal/repo/persistent/repo.go",
+		"docker-compose.yml",
+	}
+	for _, rel := range mustExist {
+		if _, err := os.Stat(filepath.Join(out, rel)); os.IsNotExist(err) {
+			t.Errorf("missing file: %s", rel)
+		}
+	}
+}
+
+func TestGenerate_MysqlSqlc_FileTree(t *testing.T) {
+	out := t.TempDir()
+	if err := generator.Generate(dbConfig("mysql-sqlc"), out, nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	mustExist := []string{
+		"internal/repo/persistent/repo.go",
+		"docker-compose.yml",
+		"sqlc.yaml",
+	}
+	for _, rel := range mustExist {
+		if _, err := os.Stat(filepath.Join(out, rel)); os.IsNotExist(err) {
+			t.Errorf("missing file: %s", rel)
+		}
+	}
+}
+
+func TestGenerate_MySQLDockerComposeContainsProjectName(t *testing.T) {
+	for _, db := range []string{"mysql-gorm", "mysql-raw", "mysql-sqlc"} {
+		t.Run(db, func(t *testing.T) {
+			out := t.TempDir()
+			cfg := dbConfig(db)
+			cfg.Name = "myservice"
+			if err := generator.Generate(cfg, out, nil); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			data, _ := os.ReadFile(filepath.Join(out, "docker-compose.yml"))
+			if !strings.Contains(string(data), "myservice") {
+				t.Errorf("docker-compose.yml missing project name:\n%s", data)
+			}
+		})
+	}
+}
+
+func TestGenerate_MySQLSqlcYamlContainsEngine(t *testing.T) {
+	out := t.TempDir()
+	if err := generator.Generate(dbConfig("mysql-sqlc"), out, nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(out, "sqlc.yaml"))
+	if err != nil {
+		t.Fatalf("read sqlc.yaml: %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{"version", "mysql"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("sqlc.yaml missing %q:\n%s", want, content)
+		}
+	}
+}
+
+func TestGenerate_MySQLGoModContainsDeps(t *testing.T) {
+	cases := []struct {
+		db      string
+		wantDep string
+	}{
+		{"mysql-gorm", "gorm.io/gorm"},
+		{"mysql-gorm", "gorm.io/driver/mysql"},
+		{"mysql-raw", "github.com/go-sql-driver/mysql"},
+		{"mysql-sqlc", "github.com/go-sql-driver/mysql"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.db+"/"+tc.wantDep, func(t *testing.T) {
+			out := t.TempDir()
+			if err := generator.Generate(dbConfig(tc.db), out, nil); err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			data, _ := os.ReadFile(filepath.Join(out, "go.mod"))
+			if !strings.Contains(string(data), tc.wantDep) {
+				t.Errorf("go.mod missing %q:\n%s", tc.wantDep, data)
+			}
+		})
+	}
+}
+
 func TestGenerate_PostgresGoModContainsDeps(t *testing.T) {
 	cases := []struct {
 		db      string
@@ -200,6 +311,9 @@ func TestGenerate_DBBuilds(t *testing.T) {
 		{"postgres-raw", false},
 		{"sqlite-gorm", true},
 		{"sqlite-raw", true},
+		{"mysql-gorm", false},
+		{"mysql-raw", false},
+		{"mysql-sqlc", false},
 		{"none", false},
 	}
 

@@ -1,0 +1,56 @@
+package handler
+{{- if eq .DB "none"}}
+
+// No person handler is generated when DB is set to "none".
+{{- else}}
+
+import (
+	"strings"
+
+	"github.com/gofiber/fiber/v2"
+
+	"{{.Module}}/internal/usecase"
+)
+
+// PersonHandler handles HTTP requests for the Person resource.
+type PersonHandler struct {
+	svc *usecase.PersonService
+}
+
+// NewPersonHandler creates a PersonHandler backed by the given service.
+func NewPersonHandler(svc *usecase.PersonService) *PersonHandler {
+	return &PersonHandler{svc: svc}
+}
+
+type createPersonRequest struct {
+	Name string `json:"name"`
+}
+
+// Create handles POST /api/v1/persons.
+func (h *PersonHandler) Create(c *fiber.Ctx) error {
+	var req createPersonRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+	if strings.TrimSpace(req.Name) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name is required"})
+	}
+
+	person, err := h.svc.Create(c.Context(), req.Name)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.Status(fiber.StatusCreated).JSON(person)
+}
+
+// List handles GET /api/v1/persons.
+func (h *PersonHandler) List(c *fiber.Ctx) error {
+	persons, err := h.svc.List(c.Context())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(persons)
+}
+{{- end}}

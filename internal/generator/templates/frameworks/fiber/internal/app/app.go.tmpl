@@ -1,0 +1,72 @@
+package app
+
+import (
+	"context"
+	"fmt"
+	"os/signal"
+	"syscall"
+	"time"
+{{- $isGorm := or (eq .DB "postgres-gorm") (eq .DB "sqlite-gorm") (eq .DB "mysql-gorm")}}
+{{- $hasDB  := ne .DB "none"}}
+
+	"{{.Module}}/config"
+	controller "{{.Module}}/internal/controller/http"
+{{- if $hasDB}}
+	"{{.Module}}/internal/repo/persistent"
+{{- end}}
+{{- if $isGorm}}
+	"{{.Module}}/internal/entity"
+{{- end}}
+	"{{.Module}}/internal/repo/webapi"
+	"{{.Module}}/internal/usecase"
+	"{{.Module}}/pkg/client"
+	"{{.Module}}/pkg/logger"
+)
+
+// Run initialises dependencies, starts the Fiber HTTP server, and blocks until
+// an OS signal is received, then performs a graceful shutdown.
+func Run() {
+	cfg := config.Load()
+	log := logger.New()
+{{if $hasDB}}
+{{- if $isGorm}}
+	db, err := persistent.Connect()
+{{- else}}
+	db, err := persistent.Connect(context.Background())
+{{- end}}
+	if err != nil {
+		log.Error("database connection failed", "error", err.Error())
+		return
+	}
+{{if $isGorm}}
+	if err := db.Conn.AutoMigrate(&entity.Person{}); err != nil {
+		log.Error("auto migration failed", "error", err.Error())
+		return
+	}
+{{end}}
+	personRepo := persistent.NewPersonRepo(db)
+	personSvc := usecase.NewPersonService(personRepo)
+{{end}}
+	httpClient := client.New("https://jsonplaceholder.typicode.com", 30*time.Second)
+	postSvc := usecase.NewPostService(webapi.New(httpClient))
+
+	app := controller.NewRouter(log{{if $hasDB}}, personSvc{{end}}, postSvc)
+
+	log.Info("server starting", "port", cfg.Server.Port)
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		if err := app.Listen(fmt.Sprintf(":%d", cfg.Server.Port)); err != nil {
+			log.Error("server error", "error", err.Error())
+		}
+	}()
+
+	<-ctx.Done()
+	log.Info("shutting down")
+
+	if err := app.ShutdownWithTimeout(5 * time.Second); err != nil {
+		log.Error("graceful shutdown error", "error", err.Error())
+	}
+}

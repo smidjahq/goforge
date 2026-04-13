@@ -4,29 +4,76 @@ package validator
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/smidjahq/goforge/internal/config"
 )
 
+var goVersionRe = regexp.MustCompile(`^\d+\.\d+$`)
+
 // validCombinations maps a DB backend to the ORM/access layers that are
 // supported with it. "none" has no layers.
 var validCombinations = map[string][]string{
 	"postgres": {"gorm", "sqlc", "raw"},
 	"sqlite":   {"gorm", "raw"},
+	"mysql":    {"gorm", "sqlc", "raw"},
 	"none":     {},
 }
 
 // validFrameworks lists frameworks that are currently selectable.
 // Echo and Fiber exist in the template tree but are not yet enabled.
-var validFrameworks = []string{"gin", "chi"}
+var validFrameworks = []string{"gin", "chi", "echo", "fiber"}
 
 // validLoggers lists supported logger implementations.
 var validLoggers = []string{"slog", "zap", "zerolog"}
 
 // validExtras lists all recognised extra options.
 var validExtras = []string{"docker", "makefile", "ci", "swagger", "migrations", "linter"}
+
+// Frameworks returns the list of currently enabled HTTP frameworks.
+func Frameworks() []string {
+	out := make([]string, len(validFrameworks))
+	copy(out, validFrameworks)
+	return out
+}
+
+// Loggers returns the list of supported logger implementations.
+func Loggers() []string {
+	out := make([]string, len(validLoggers))
+	copy(out, validLoggers)
+	return out
+}
+
+// Extras returns the list of recognised extra options.
+func Extras() []string {
+	out := make([]string, len(validExtras))
+	copy(out, validExtras)
+	return out
+}
+
+// DBCombinations returns all valid DB values accepted by the --db flag,
+// including "none" and every "backend-layer" pair.
+func DBCombinations() []string {
+	out := []string{}
+	// Stable ordering: postgres, sqlite, mysql, none
+	order := []string{"postgres", "sqlite", "mysql", "none"}
+	for _, backend := range order {
+		layers, ok := validCombinations[backend]
+		if !ok {
+			continue
+		}
+		if len(layers) == 0 {
+			out = append(out, backend)
+			continue
+		}
+		for _, layer := range layers {
+			out = append(out, backend+"-"+layer)
+		}
+	}
+	return out
+}
 
 // ValidOptionsFor returns the valid ORM/access-layer options for the given DB
 // backend (e.g. "postgres", "sqlite", "none"). Returns nil for unknown backends.
@@ -63,10 +110,26 @@ func Validate(cfg config.Config) error {
 	if err := validateExtras(cfg.Extras, cfg.DB); err != nil {
 		return err
 	}
+	if err := validateGoVersion(cfg.GoVersion); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateGoVersion(v string) error {
+	if v == "" {
+		return nil // empty means "use toolchain default"; CLI/TUI always populate this
+	}
+	if !goVersionRe.MatchString(v) {
+		return fmt.Errorf("invalid go version %q; expected format: major.minor (e.g. 1.26)", v)
+	}
 	return nil
 }
 
 func validateFramework(framework string) error {
+	if framework == "" {
+		return fmt.Errorf("framework is required; valid options: %s", strings.Join(validFrameworks, ", "))
+	}
 	if !slices.Contains(validFrameworks, framework) {
 		return fmt.Errorf(
 			"unknown framework %q; valid options: %s",

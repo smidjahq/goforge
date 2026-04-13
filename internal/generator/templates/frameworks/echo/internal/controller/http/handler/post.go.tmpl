@@ -1,0 +1,29 @@
+package handler
+
+import (
+	"net/http"
+
+	"github.com/labstack/echo/v4"
+
+	"{{.Module}}/internal/usecase"
+)
+
+// PostHandler handles HTTP requests that delegate to an external API.
+type PostHandler struct {
+	svc *usecase.PostService
+}
+
+// NewPostHandler creates a PostHandler backed by the given service.
+func NewPostHandler(svc *usecase.PostService) *PostHandler {
+	return &PostHandler{svc: svc}
+}
+
+// List handles GET /api/v1/posts.
+func (h *PostHandler) List(c echo.Context) error {
+	posts, err := h.svc.ListPosts(c.Request().Context())
+	if err != nil {
+		return c.JSON(http.StatusBadGateway, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, posts)
+}

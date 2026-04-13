@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-{{- $isGorm := or (eq .DB "postgres-gorm") (eq .DB "sqlite-gorm")}}
+{{- $isGorm := or (eq .DB "postgres-gorm") (eq .DB "sqlite-gorm") (eq .DB "mysql-gorm")}}
 {{- $hasDB  := ne .DB "none"}}
 
 	"{{.Module}}/config"

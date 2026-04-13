@@ -22,6 +22,40 @@ func frameworkConfig(framework string) config.Config {
 	}
 }
 
+func TestGenerate_EchoFileTree(t *testing.T) {
+	out := t.TempDir()
+	if err := generator.Generate(frameworkConfig("echo"), out, nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	mustExist := []string{
+		"internal/app/app.go",
+		"internal/controller/http/router.go",
+	}
+	for _, rel := range mustExist {
+		if _, err := os.Stat(filepath.Join(out, rel)); os.IsNotExist(err) {
+			t.Errorf("missing file: %s", rel)
+		}
+	}
+}
+
+func TestGenerate_FiberFileTree(t *testing.T) {
+	out := t.TempDir()
+	if err := generator.Generate(frameworkConfig("fiber"), out, nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	mustExist := []string{
+		"internal/app/app.go",
+		"internal/controller/http/router.go",
+	}
+	for _, rel := range mustExist {
+		if _, err := os.Stat(filepath.Join(out, rel)); os.IsNotExist(err) {
+			t.Errorf("missing file: %s", rel)
+		}
+	}
+}
+
 func TestGenerate_GinFileTree(t *testing.T) {
 	out := t.TempDir()
 	if err := generator.Generate(frameworkConfig("gin"), out, nil); err != nil {
@@ -53,6 +87,36 @@ func TestGenerate_ChiFileTree(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(out, rel)); os.IsNotExist(err) {
 			t.Errorf("missing file: %s", rel)
 		}
+	}
+}
+
+func TestGenerate_EchoRouterContainsHealthz(t *testing.T) {
+	out := t.TempDir()
+	if err := generator.Generate(frameworkConfig("echo"), out, nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(out, "internal/controller/http/router.go"))
+	if !strings.Contains(string(data), "/healthz") {
+		t.Error("echo router.go missing /healthz route")
+	}
+	if !strings.Contains(string(data), "labstack/echo") {
+		t.Error("echo router.go missing echo import")
+	}
+}
+
+func TestGenerate_FiberRouterContainsHealthz(t *testing.T) {
+	out := t.TempDir()
+	if err := generator.Generate(frameworkConfig("fiber"), out, nil); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(out, "internal/controller/http/router.go"))
+	if !strings.Contains(string(data), "/healthz") {
+		t.Error("fiber router.go missing /healthz route")
+	}
+	if !strings.Contains(string(data), "gofiber/fiber") {
+		t.Error("fiber router.go missing fiber import")
 	}
 }
 
@@ -93,6 +157,8 @@ func TestGenerate_FrameworkGoModContainsDep(t *testing.T) {
 	}{
 		{"gin", "github.com/gin-gonic/gin"},
 		{"chi", "github.com/go-chi/chi/v5"},
+		{"echo", "github.com/labstack/echo/v4"},
+		{"fiber", "github.com/gofiber/fiber/v2"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.framework, func(t *testing.T) {
@@ -109,7 +175,7 @@ func TestGenerate_FrameworkGoModContainsDep(t *testing.T) {
 }
 
 func TestGenerate_FrameworkAppGoImportsController(t *testing.T) {
-	for _, fw := range []string{"gin", "chi"} {
+	for _, fw := range []string{"gin", "chi", "echo", "fiber"} {
 		t.Run(fw, func(t *testing.T) {
 			out := t.TempDir()
 			cfg := frameworkConfig(fw)
@@ -133,7 +199,7 @@ func TestGenerate_FrameworkBuilds(t *testing.T) {
 		t.Skip("go binary not in PATH")
 	}
 
-	for _, fw := range []string{"gin", "chi"} {
+	for _, fw := range []string{"gin", "chi", "echo", "fiber"} {
 		t.Run(fw, func(t *testing.T) {
 			out := t.TempDir()
 			if err := generator.Generate(frameworkConfig(fw), out, nil); err != nil {
